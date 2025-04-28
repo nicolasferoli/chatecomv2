@@ -1,0 +1,144 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Regras de Limpeza de Repositório
+
+## 🎯 Objetivo
+
+Manter o repositório limpo, organizado e eficiente, prevenindo conflitos e facilitando a manutenção através de uma análise pós-commit automatizada.
+
+## 📋 Procedimento de Limpeza
+
+A limpeza deve ser executada automaticamente após cada inserção de código bem-sucedida, seguindo uma análise detalhada do repositório.
+
+## 🗑️ Itens para Remoção
+
+### 1. Arquivos de Teste
+
+- Testes obsoletos
+
+- Duplicatas de testes
+
+- Testes sem referência ao código atual
+
+### 2. Arquivos Temporários
+
+- .tmp
+
+- .cache
+
+- Logs não essenciais
+
+- Arquivos de cache do sistema
+
+### 3. Artefatos de Build
+
+- Diretório dist/
+
+- Diretório build/
+
+- Diretório out/
+
+- Builds intermediários
+
+### 4. Código Legado
+
+- Implementações descontinuadas
+
+- Recursos substituídos
+
+- Código comentado obsoleto
+
+### 5. Componentes Redundantes
+
+- Componentes duplicados
+
+- Versões antigas substituídas
+
+- Implementações sobrepostas
+
+### 6. Configurações
+
+- Arquivos de configuração sem uso
+
+- Configurações obsoletas
+
+- Settings duplicados
+
+### 7. Dependências
+
+- Pacotes não utilizados
+
+- Importações sem referência
+
+- Módulos abandonados
+
+### 8. Documentação
+
+- Docs desatualizados
+
+- Documentação redundante
+
+- Guias obsoletos
+
+## ⚠️ Processo de Verificação
+
+1. Análise
+
+- Executar verificação automatizada
+
+- Identificar itens candidatos à remoção
+
+- Usar ferramentas de análise estática
+
+2. Validação
+
+- Verificar essencialidade dos arquivos
+
+- Criar lista de itens para revisão
+
+- Documentar justificativas
+
+3. Remoção
+
+- Executar limpeza após aprovação
+
+- Manter backup temporário
+
+- Registrar alterações
+
+4. Relatório
+
+- Listar itens removidos
+
+- Documentar impactos
+
+- Registrar data/hora
+
+- Incluir ferramentas utilizadas
+
+## 🚫 Exceções
+
+NUNCA remover:
+
+- Arquivos essenciais do sistema
+
+- Configurações críticas
+
+- Documentação atual
+
+- Testes ativos
+
+## 👤 Responsabilidades
+
+O desenvolvedor deve:
+
+- Revisar o relatório de limpeza
+
+- Validar alterações propostas
+
+- Garantir integridade do sistema
+
+- Manter documentação atualizada

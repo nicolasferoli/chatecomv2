@@ -1,0 +1,325 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+**Best Practices and "Cursor + Security Enhancement" Workflow**
+
+# Web Development Best Practices (Backend, Frontend, RPA) - With AI Assistance Considerations
+
+This document outlines best practices for secure web development, considering the use of AI coding assistants like Cursor. It emphasizes the crucial role of manual code review and enhancement even when using AI.
+
+## 1. Overall Security Principles (Applicable to All Layers)
+
+*   **Principle of Least Privilege:**  Grant only the necessary permissions to users, services, and database roles.
+*   **Defense in Depth:** Implement multiple layers of security controls.  Don't rely on a single security mechanism.
+*   **Secure by Default:** Configure systems and applications with security as the default setting.
+*   **Regular Updates:** Keep all software (OS, frameworks, libraries, dependencies) up-to-date to patch vulnerabilities.
+*   **Input Validation:** Validate *all* inputs, both on the client-side (for user experience) and *especially* on the server-side (for security).
+*   **Output Encoding:**  Encode output to prevent Cross-Site Scripting (XSS) attacks.
+*   **Error Handling:**  Implement robust error handling that doesn't reveal sensitive information to the user.
+*   **Logging and Monitoring:** Log security-relevant events and monitor for suspicious activity.
+*   **Secrets Management:**  Never hardcode secrets (API keys, database credentials, etc.). Use environment variables or a dedicated secrets management solution.
+
+## 2. Backend (Supabase in this context)**
+
+### 2.1. Row-Level Security (RLS)
+
+*   **Best Practice:**  *Always* enable RLS on your Supabase tables. Define policies that precisely control which users can access which data.
+*   **Hypothetical Cursor-Generated SQL (Initial - Needs Refinement):**
+
+    ```sql
+    -- Cursor might generate something basic like this:
+    CREATE POLICY "Users can see their own data" ON my_table
+    FOR SELECT
+    USING (auth.uid() = user_id);
+    ```
+
+*   **Manual Enhancement (Crucial):**
+    *   **Consider ALL operations:**  The above example only covers `SELECT`.  You *must* add policies for `INSERT`, `UPDATE`, and `DELETE` as appropriate.
+    *   **Complex Conditions:**  Real-world scenarios often require more complex conditions.  For example:
+        ```sql
+        -- Allow users to update their own profiles, but only certain fields.
+        CREATE POLICY "Users can update some profile fields" ON profiles
+        FOR UPDATE
+        USING (auth.uid() = user_id)
+        WITH CHECK (
+            auth.uid() = user_id AND
+            (NEW.bio IS NOT NULL OR NEW.profile_picture_url IS NOT NULL) -- Example: Only allow updating bio and picture
+        );
+
+        -- Prevent users from deleting their accounts directly (maybe a support process is needed).
+        CREATE POLICY "No direct account deletion" ON profiles
+        FOR DELETE
+        USING (false);
+        ```
+    *   **Testing:** Thoroughly test your RLS policies using different user roles and scenarios to ensure they work as expected.  Use Supabase's SQL editor to simulate different `auth.uid()` values.
+
+### 2.2. API Security (Supabase Edge Functions or other API Gateways)
+
+*   **Best Practice:** Protect your API endpoints.  Implement authentication, authorization, rate limiting, and input validation.
+*   **Hypothetical Cursor-Generated Edge Function (Incomplete):**
+
+    ```javascript
+    // Cursor might generate a basic function like this:
+    export default async (req, context) => {
+      const { data, error } = await supabase.from('my_table').select('*');
+      return new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
+    };
+    ```
+
+*   **Manual Enhancements (Absolutely Necessary):**
+
+    *   **Authentication:**  Ensure the user is authenticated *before* accessing data.  This might involve checking JWTs (JSON Web Tokens).
+        ```javascript
+        export default async (req, context) => {
+            // Verify JWT (using Supabase client or a JWT library)
+            const token = req.headers.get('Authorization')?.replace('Bearer ', '');
+            if (!token) {
+              return new Response('Unauthorized', { status: 401 });
+            }
+            const { user, error } = await supabase.auth.api.getUser(token); // Example
+            if (error) {
+              return new Response('Unauthorized', { status: 401 });
+            }
+
+          const { data, error: dbError } = await supabase.from('my_table').select('*');
+          // ... rest of the function ...
+        };
+        ```
+    *   **Rate Limiting:**  Implement rate limiting to prevent abuse.  Supabase has built-in rate limiting, but you may need to configure it or use a more sophisticated solution.
+        ```javascript
+        // (Conceptual - Requires a rate-limiting library or custom logic)
+        import { rateLimit } from './rate-limiter'; // Hypothetical
+
+        export default async (req, context) => {
+            if (await rateLimit(req)) { // Hypothetical function
+                return new Response('Too Many Requests', { status: 429 });
+            }
+          // ...rest of your function...
+        };
+        ```
+    *   **Input Validation (Server-Side):**  *Never* trust client-side validation alone.
+        ```javascript
+        export default async (req, context) => {
+          const body = await req.json();
+          if (!body.someField || typeof body.someField !== 'string' || body.someField.length > 100) {
+            return new Response('Invalid Input', { status: 400 });
+          }
+          // ... proceed with processing the validated input ...
+        };
+        ```
+    *   **Authorization (Beyond RLS):**  RLS handles data-level authorization.  You might also need API-level authorization (e.g., checking if a user has a specific role to access a particular endpoint).
+
+### 2.3. Database Security
+
+*   **Best Practice:** Use strong passwords, restrict network access to your database, and regularly audit database logs.
+*   **Cursor Role:** Cursor likely won't directly generate database configuration.  This is more of a platform/infrastructure concern.
+*   **Manual Actions:**
+    *   **Supabase:**  Use the Supabase dashboard to manage database settings.  Consider VPC peering for enhanced network security if you're on a paid plan.
+    *   **Other Databases:**  Follow best practices for your specific database (PostgreSQL, MySQL, etc.).
+
+## 3. Frontend
+
+### 3.1. Input Validation (Client-Side)
+
+*   **Best Practice:**  Provide immediate feedback to users with client-side validation, but *always* re-validate on the server.
+*   **Hypothetical Cursor-Generated React Code (Basic):**
+
+    ```javascript
+    // Cursor might generate something like this:
+    function MyForm() {
+      const [email, setEmail] = useState('');
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        // (Missing validation - Cursor might add basic HTML5 validation, but that's not enough)
+        sendDataToServer(email);
+      };
+      return (
+        <form onSubmit={handleSubmit}>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <button type="submit">Submit</button>
+        </form>
+      );
+    }
+    ```
+
+*   **Manual Enhancements:**
+
+    *   **Robust Validation Library:** Use a library like `validator.js` or `yup` for more comprehensive validation rules.
+        ```javascript
+        import { useState } from 'react';
+        import * as yup from 'yup'; // Or validator.js
+
+        const schema = yup.object().shape({
+          email: yup.string().email().required(),
+        });
+
+        function MyForm() {
+          const [email, setEmail] = useState('');
+          const [error, setError] = useState('');
+
+          const handleSubmit = async (e) => {
+            e.preventDefault();
+            setError('');
+            try {
+              await schema.validate({ email });
+              sendDataToServer(email);
+            } catch (validationError) {
+              setError(validationError.message);
+            }
+          };
+
+          return (
+            <form onSubmit={handleSubmit}>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              {error && <p style={{ color: 'red' }}>{error}</p>}
+              <button type="submit">Submit</button>
+            </form>
+          );
+        }
+        ```
+    *   **Error Display:** Provide clear and user-friendly error messages.
+
+### 3.2. Authentication and Authorization
+
+*   **Best Practice:** Use secure authentication mechanisms (e.g., JWTs, OAuth) and handle tokens securely.
+*   **Hypothetical Cursor-Generated Code (Partial):**
+
+    ```javascript
+    // Cursor might generate a basic login function:
+    async function login(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      // (Missing:  Securely store the token, handle errors properly)
+      return data;
+    }
+    ```
+
+*   **Manual Enhancements:**
+
+    *   **Secure Token Storage:**  *Never* store JWTs in `localStorage` or `sessionStorage` if they are long-lived. Use `httpOnly` cookies for better security.
+        ```javascript
+        // (Illustrative - using a hypothetical cookie library)
+        import Cookies from 'js-cookie';
+
+        async function login(email, password) {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) {
+            // Handle error (display to user)
+            return;
+          }
+          // Store the token in an httpOnly cookie
+          Cookies.set('access_token', data.access_token, { httpOnly: true, secure: true, sameSite: 'strict' });
+          // ... redirect the user ...
+        }
+        ```
+    *   **Token Refresh:** Implement token refresh mechanisms to avoid frequent re-logins.
+    *   **Logout:**  Clear the token securely on logout.
+
+### 3.3. Cross-Site Scripting (XSS) Prevention
+
+*   **Best Practice:**  Sanitize and encode all user-generated content before displaying it.
+*   **Hypothetical Cursor-Generated Code (Potentially Vulnerable):**
+
+    ```javascript
+    // Cursor MIGHT generate something like this, which is VULNERABLE:
+    function DisplayComment({ comment }) {
+      return (
+        <div>
+          {/* DANGEROUS: Directly inserting user input */}
+          <p>{comment.text}</p>
+        </div>
+      );
+    }
+    ```
+
+*   **Manual Enhancements (Essential):**
+
+    *   **React's Built-in Protection:**  React helps prevent XSS by escaping output by default.  However, you must be careful when using `dangerouslySetInnerHTML`.
+    *   **Sanitization Library:** If you *must* render HTML from user input, use a sanitization library like `DOMPurify`.
+        ```javascript
+        import DOMPurify from 'dompurify';
+
+        function DisplayComment({ comment }) {
+          const sanitizedText = DOMPurify.sanitize(comment.text); // Sanitize
+          return (
+            <div>
+              <p dangerouslySetInnerHTML={{ __html: sanitizedText }} />
+            </div>
+          );
+        }
+        ```
+        * **Avoid dangerouslySetInnerHTML:** Use whenever is possible JSX instead of dangerouslySetInnerHTML
+
+### 3.4. Content Security Policy (CSP)
+
+*   **Best Practice:**  Implement a CSP to control which resources the browser is allowed to load. This helps prevent XSS and other injection attacks.
+*   **Cursor Role:** Cursor might help generate a basic CSP header, but manual review and customization are essential.
+*   **Manual Action:**  Add a CSP header to your HTML (or configure it in your web server).
+    ```html
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' [https://www.google-analytics.com](https://www.google-analytics.com); img-src 'self' data:; style-src 'self' 'unsafe-inline';">
+    ```
+    *   **Customize:**  Tailor the CSP to your application's specific needs.  Use a CSP evaluator to test your policy.
+
+### 3.5. CAPTCHA
+
+*   **Best practice:** Implement CAPTCHA for forms such as sign up, log in, and password reset to prevent abuse.
+*   **Hypothetical Cursor-Generated Code (incomplete):**
+
+      ```javascript
+      //Cursor could generate something like this
+      import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+
+      const MyForm = () => {
+      const { executeRecaptcha } = useGoogleReCaptcha();
+
+        const handleSubmit = async (event) => {
+          event.preventDefault();
+          if (!executeRecaptcha) {
+            console.log('Execute recaptcha not yet available');
+            return;
+          }
+          //Missing reCaptcha verification token
+        }
+        return (
+          <form onSubmit={handleSubmit}>
+            <label>
+              Email:
+              <input type="email" name="email" required />
+            </label>
+            <button type="submit">Submit</button>
+          </form>
+        )
+      }
+      ```
+
+*   **Manual Enhancements (Absolutely Necessary):**
+    *   **Server-Side Verification:**  *Never* trust client-side CAPTCHA verification alone.
+    * **Token usage:** Add the captha generated token to the submit.
+
+        ```javascript
+        import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+
+        const MyForm = () => {
+        const { executeRecaptcha } = useGoogleReCaptcha();
+
+          const handleSubmit = async (event) => {
+            event.preventDefault();
+            if (!executeRecaptcha) {
+              console.log('Execute recaptcha not yet available');
+              return;
+            }
+            const token = await executeRecaptcha('handleSubmit');
+              //Send token and form data to your backend.
+          }
+          return (
+            <form onSubmit={handleSubmit}>
+              <label>
+                Email:
+                <input type="email" name="email" required />
+              </label>
+              <button type="submit">Submit</button>
+            </form>
+          )
+        }
+        ```
