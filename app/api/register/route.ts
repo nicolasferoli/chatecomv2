@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { registerUser } from '../auth/[...nextauth]/route';
+import { registerUser } from '../_lib/auth/users';
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Registrando o usuário usando a função do NextAuth
+      // Registrando o usuário usando a função do módulo de usuários
       const user = await registerUser(name, email, password);
       
       // Retorno de sucesso
